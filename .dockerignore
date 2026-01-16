@@ -1,0 +1,9 @@
+.git
+.gitignore
+.gradle
+build/
+**/build/
+**/target/
+.env
+.vscode
+docs/

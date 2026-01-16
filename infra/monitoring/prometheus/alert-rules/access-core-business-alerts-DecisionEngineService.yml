@@ -1,0 +1,353 @@
+# access-core-business-alerts-DecisionEngineService.yml
+groups:
+  - name: access-core.business.DecisionEngineService
+    rules:
+      # =========================================================
+      # 1) ERROR rate del motor (resultado ERROR)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineHighErrorRateWarning
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",result="ERROR"}[5m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[5m]))
+          ) > 0.02
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine ERROR > 2% (10m)"
+          description: "El motor está produciendo decisiones ERROR con tráfico suficiente. Revisa contexto incompleto, catálogo/motivos y excepciones."
+
+      - alert: AccessCoreBusinessEngineHighErrorRateCritical
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",result="ERROR"}[5m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[5m]))
+          ) > 0.05
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine ERROR > 5% (5m)"
+          description: "Incidente probable: el motor falla con tráfico. Prioriza investigar stacktraces, dependencias (DB/cache) y validaciones del DecisionContext."
+
+      # =========================================================
+      # 2) POLICY_ERROR (reason) sube (data/política inconsistente)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineHighPolicyErrorReasonWarning
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",reason="POLICY_ERROR"}[10m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[10m]))
+          ) > 0.01
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine POLICY_ERROR > 1% (15m)"
+          description: "Aumentaron decisiones con motivo POLICY_ERROR. Suele indicar contexto incompleto, reglas mal formadas o catálogos inconsistentes."
+
+      - alert: AccessCoreBusinessEngineHighPolicyErrorReasonCritical
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",reason="POLICY_ERROR"}[10m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[10m]))
+          ) > 0.03
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine POLICY_ERROR > 3% (10m)"
+          description: "Incidente probable de datos/política: muchos requests terminan en POLICY_ERROR. Revisa cambios recientes en contrato del gateway y catálogo de motivos."
+
+      # =========================================================
+      # 3) NO_RULES_FOR_CONTEXT alto (no hay reglas base)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineHighNoRulesForContextWarning
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",reason="NO_RULES_FOR_CONTEXT"}[10m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[10m]))
+          ) > 0.05
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: NO_RULES_FOR_CONTEXT > 5% (15m)"
+          description: "Muchos contextos no tienen reglas base (org/area/sujeto). Puede ser configuración incompleta, migración fallida o cache vacío."
+
+      - alert: AccessCoreBusinessEngineHighNoRulesForContextCritical
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",reason="NO_RULES_FOR_CONTEXT"}[10m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[10m]))
+          ) > 0.20
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: NO_RULES_FOR_CONTEXT > 20% (10m)"
+          description: "Outage de política probable: demasiados contextos sin reglas base. Revisa carga/estado de reglas, invalidación de caché y consultas del provider."
+
+      # =========================================================
+      # 4) NO_MATCHING_RULE alto (sí hay reglas, pero no aplican)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineHighNoMatchingRuleWarning
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",reason="NO_MATCHING_RULE"}[10m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[10m]))
+          ) > 0.10
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: NO_MATCHING_RULE > 10% (15m)"
+          description: "El motor encuentra reglas base pero ninguna aplica (ventanas, vigencias, dispositivo/método/dirección). Revisa reglas activas y zona horaria efectiva."
+
+      - alert: AccessCoreBusinessEngineHighNoMatchingRuleCritical
+        expr: |
+          (
+            sum(rate(access_engine_decisions_total{job="access-core",reason="NO_MATCHING_RULE"}[10m]))
+            /
+            sum(rate(access_engine_decisions_total{job="access-core"}[10m]))
+          ) > 0.30
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: NO_MATCHING_RULE > 30% (10m)"
+          description: "Probable fallo de configuración/reglas: la mayoría no matchea. Verifica ventanas diarias, vigencias UTC y filtros por dispositivo/método/dirección."
+
+      # =========================================================
+      # 5) Fallback de zona (zoneProvider null/exception)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineZoneFallbackDetectedWarning
+        expr: |
+          increase(access_engine_zone_fallback_total{job="access-core"}[15m]) > 0
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[15m])) > 0.1
+        for: 0m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine usando zona fallback (UTC)"
+          description: "zoneProvider falló o devolvió null y el motor cayó a UTC. Puede romper ventanas diarias. Revisa configuración de zona por tenant/área."
+
+      - alert: AccessCoreBusinessEngineZoneFallbackBurstCritical
+        expr: |
+          increase(access_engine_zone_fallback_total{job="access-core"}[10m]) > 10
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: muchos zone fallbacks en DecisionEngine (5m)"
+          description: "Incidente probable: fallos repetidos al resolver zona efectiva. Afecta matching por ventana diaria. Revisa dependencias/config del zoneProvider."
+
+      # =========================================================
+      # 6) Reglas malformadas (solo una hora definida)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineMalformedDailyRulesDetectedWarning
+        expr: |
+          increase(access_engine_rules_malformed_daily_total{job="access-core"}[30m]) > 0
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[30m])) > 0.1
+        for: 0m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: reglas con ventana diaria malformada detectadas"
+          description: "Hay reglas con solo desde/hasta definido (XOR). Esas reglas nunca aplican. Revisa UI/validaciones y datos en DB."
+
+      - alert: AccessCoreBusinessEngineMalformedDailyRulesBurstCritical
+        expr: |
+          increase(access_engine_rules_malformed_daily_total{job="access-core"}[10m]) > 25
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: spike de reglas malformadas (ventana diaria)"
+          description: "Probable bug de creación/actualización de reglas o migración. Muchas reglas quedan inutilizables. Bloquea cambios y corrige datos."
+
+      # =========================================================
+      # 7) Latencia p95 del motor (evaluate completo)
+      # =========================================================
+      - alert: AccessCoreBusinessEngineP95HighWarning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_engine_seconds_bucket{job="access-core"}[10m])) by (le)
+          ) > 0.05
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine p95 > 50ms (15m)"
+          description: "El evaluate del motor está lento (p95). Revisa tamaño de candidatos, GC, CPU y degradación del provider/caché."
+
+      - alert: AccessCoreBusinessEngineP95HighCritical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_engine_seconds_bucket{job="access-core"}[10m])) by (le)
+          ) > 0.20
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: DecisionEngine p95 > 200ms (10m)"
+          description: "Latencia crítica del motor. Probable saturación (CPU/GC) o explosión de candidatos por área/sujeto. Investiga rápidamente."
+
+      # =========================================================
+      # 8) Latencia p95 del matching en memoria
+      # =========================================================
+      - alert: AccessCoreBusinessEngineMatchP95HighWarning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_engine_match_seconds_bucket{job="access-core"}[10m])) by (le)
+          ) > 0.03
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: match p95 > 30ms (15m)"
+          description: "El filtro/selección de regla está lento. Normalmente indica demasiados candidatos o reglas poco selectivas."
+
+      - alert: AccessCoreBusinessEngineMatchP95HighCritical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_engine_match_seconds_bucket{job="access-core"}[10m])) by (le)
+          ) > 0.10
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: match p95 > 100ms (10m)"
+          description: "Match crítico: casi seguro hay explosión de candidatos o reglas mal diseñadas. Revisa cardinalidad (org/area/sujeto) y caché."
+
+      # =========================================================
+      # 9) Explosión de candidatos (p95 del DistributionSummary)
+      # Nota: requiere que access_engine_candidates_count exponga _sum/_count en Prometheus.
+      # =========================================================
+      - alert: AccessCoreBusinessEngineCandidatesAvgTooHighWarning
+        expr: |
+          (
+            rate(access_engine_candidates_count_sum{job="access-core"}[15m])
+            /
+            rate(access_engine_candidates_count_count{job="access-core"}[15m])
+          ) > 200
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[15m])) > 0.2
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: candidatos promedio > 200 (20m)"
+          description: "El motor está evaluando demasiadas reglas por decisión. Esto eleva latencia y costo. Revisa query del provider y partición por área/sujeto."
+
+      - alert: AccessCoreBusinessEngineCandidatesAvgTooHighCritical
+        expr: |
+          (
+            rate(access_engine_candidates_count_sum{job="access-core"}[10m])
+            /
+            rate(access_engine_candidates_count_count{job="access-core"}[10m])
+          ) > 500
+          and
+          sum(rate(access_engine_decisions_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+          component: decision-engine
+        annotations:
+          summary: "Access-Core: candidatos promedio > 500 (10m)"
+          description: "Incidente probable de performance: explosión de candidatos. Revisa índices, cache invalidation y condiciones de filtrado en DB."

@@ -1,0 +1,211 @@
+groups:
+  - name: access-core.red
+    rules:
+      # =========================
+      # RED: 5xx Error Rate
+      # =========================
+      - alert: AccessCoreHigh5xxRateWarning
+        expr: |
+          (
+            100 * (
+              sum(rate(http_server_requests_seconds_count{job="access-core",status=~"5..",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m])), 1e-6)
+            )
+          ) > 1
+
+        for: 5m
+        labels:
+          severity: warning
+          service: access-core
+          category: red
+        annotations:
+          summary: "Access-Core: 5xx rate > 1% (5m)"
+          description: "La tasa de errores 5xx superó 1% durante 5m. Revisa logs, dependencias y DB."
+
+      - alert: AccessCoreHigh5xxRateCritical
+        expr: |
+          (
+            100 * (
+              sum(rate(http_server_requests_seconds_count{job="access-core",status=~"5..",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m])), 1e-6)
+            )
+          ) > 5
+        for: 3m
+        labels:
+          severity: critical
+          service: access-core
+          category: red
+        annotations:
+          summary: "Access-Core: 5xx rate > 5% (3m)"
+          description: "Incidente probable: 5xx elevado sostenido. Prioriza revisar DB pool, Kafka, timeouts y errores."
+
+      # =========================
+      # RED: Latency p95 (seconds)
+      # =========================
+      - alert: AccessCoreHighLatencyP95Warning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_server_requests_seconds_bucket{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m])) by (le)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: red
+        annotations:
+          summary: "Access-Core: p95 latency > 500ms (10m)"
+          description: "La latencia p95 superó 500ms por 10m. Revisa endpoints top, DB blocking y saturación."
+
+      - alert: AccessCoreHighLatencyP95Critical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_server_requests_seconds_bucket{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m])) by (le)
+          ) > 1.5
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: red
+        annotations:
+          summary: "Access-Core: p95 latency > 1.5s (5m)"
+          description: "Latencia crítica sostenida. Revisa DB pool, GC pauses, threads blocked y dependencias."
+
+      # =========================
+      # RED: Traffic drop (cuando había tráfico)
+      # =========================
+      - alert: AccessCoreTrafficDropWarning
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[5m]))
+            <
+            0.2 * sum(rate(http_server_requests_seconds_count{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[1h]))
+          )
+          and
+          sum(rate(http_server_requests_seconds_count{job="access-core",uri!~"/q/metrics|/q/health|/q/openapi|/q/swagger-ui.*"}[1h])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: red
+        annotations:
+          summary: "Access-Core: caída fuerte de RPS"
+          description: "El tráfico actual cayó a <20% del baseline (1h) durante 10m. Puede ser outage, red o gateway."
+
+  - name: access-core.use
+    rules:
+      # =========================
+      # USE: Heap usage ratio
+      # =========================
+      - alert: AccessCoreHighHeapUsageWarning
+        expr: |
+          (
+            sum(jvm_memory_used_bytes{job="access-core",area="heap"})
+            /
+            sum(jvm_memory_max_bytes{job="access-core",area="heap"})
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: use
+        annotations:
+          summary: "Access-Core: heap > 85% (10m)"
+          description: "Heap alto sostenido. Puede indicar presión de memoria, fuga, o carga alta."
+
+      - alert: AccessCoreHighHeapUsageCritical
+        expr: |
+          (
+            sum(jvm_memory_used_bytes{job="access-core",area="heap"})
+            /
+            sum(jvm_memory_max_bytes{job="access-core",area="heap"})
+          ) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: use
+        annotations:
+          summary: "Access-Core: heap > 95% (5m)"
+          description: "Riesgo de OOM. Revisa heap dump, GC, cachés, colas, y objetos retenidos."
+
+      # =========================
+      # USE: blocked threads
+      # =========================
+      - alert: AccessCoreBlockedThreadsWarning
+        expr: |
+          jvm_threads_states_threads{job="access-core",state="blocked"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: access-core
+          category: use
+        annotations:
+          summary: "Access-Core: threads bloqueados > 0 (5m)"
+          description: "Posible contention/deadlock. Revisa locks, sincronización, pool DB, y llamadas bloqueantes."
+
+  - name: access-core.db
+    rules:
+      # =========================
+      # DB pool: no available conns
+      # =========================
+      - alert: AccessCoreDbNoAvailableConnectionsCritical
+        expr: |
+          agroal_available_count{job="access-core",datasource="default"} <= 0
+        for: 2m
+        labels:
+          severity: critical
+          service: access-core
+          category: db
+        annotations:
+          summary: "Access-Core: DB pool sin conexiones disponibles (2m)"
+          description: "El pool se quedó sin conexiones libres. Revisa max-size, leaks, queries lentas y timeouts."
+
+      # =========================
+      # DB pool: high saturation
+      # =========================
+      - alert: AccessCoreDbPoolSaturationWarning
+        expr: |
+          (
+            agroal_active_count{job="access-core",datasource="default"}
+            /
+            (agroal_active_count{job="access-core",datasource="default"} + agroal_available_count{job="access-core",datasource="default"})
+          ) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: access-core
+          category: db
+        annotations:
+          summary: "Access-Core: saturación del pool DB > 90% (5m)"
+          description: "Pool casi lleno. Puede causar latencia y fallas intermitentes. Revisa blocking time y queries."
+
+      # =========================
+      # DB pool: blocking time too high
+      # =========================
+      - alert: AccessCoreDbBlockingTimeHighWarning
+        expr: |
+          agroal_blocking_time_max_milliseconds{job="access-core",datasource="default"} > 200
+        for: 5m
+        labels:
+          severity: warning
+          service: access-core
+          category: db
+        annotations:
+          summary: "Access-Core: espera por conexión DB > 200ms (5m)"
+          description: "La app está esperando conexiones DB. Revisa pool size, leaks, o DB lenta."
+
+      - alert: AccessCoreDbLeakDetectedCritical
+        expr: |
+          increase(agroal_leak_detection_count_total{job="access-core",datasource="default"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: access-core
+          category: db
+        annotations:
+          summary: "Access-Core: leak detection en Agroal"
+          description: "Agroal detectó leaks de conexiones. Urgente: revisa transacciones, cierres, y paths con excepciones."

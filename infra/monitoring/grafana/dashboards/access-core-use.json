@@ -1,0 +1,184 @@
+{
+    "uid": "haedcom-use",
+    "title": "Access Core - USE (JVM + DB)",
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "10s",
+    "tags": [
+        "haedcom",
+        "use",
+        "jvm",
+        "agroal",
+        "db"
+    ],
+    "time": {
+        "from": "now-15m",
+        "to": "now"
+    },
+    "panels": [
+        {
+            "type": "timeseries",
+            "title": "Pool DB - Activas vs Disponibles (Agroal)",
+            "description": "Estado del pool de conexiones. Activas = conexiones en uso. Disponibles = idle listas para adquirir. Si Disponibles cae a 0 o Activas se acerca al max-size del pool, puedes ver latencia y errores (timeouts) por saturación.",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "expr": "agroal_active_count{datasource=\"default\"}",
+                    "legendFormat": "activas"
+                },
+                {
+                    "refId": "B",
+                    "expr": "agroal_available_count{datasource=\"default\"}",
+                    "legendFormat": "disponibles"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "decimals": 0
+                },
+                "overrides": []
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Pool DB - Espera máxima para adquirir conexión (ms)",
+            "description": "Máximo tiempo (ms) que una request esperó para adquirir una conexión del pool (Agroal). Picos aquí suelen correlacionar con aumento de latencia p95/p99. Si sube frecuentemente: revisa consultas lentas, tamaño del pool y concurrencia.",
+            "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "expr": "agroal_blocking_time_max_milliseconds{datasource=\"default\"}",
+                    "legendFormat": "espera máx (ms)"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ms",
+                    "decimals": 0
+                },
+                "overrides": []
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Hilos JVM por estado",
+            "description": "Distribución de hilos por estado (runnable/blocked/waiting/timed-waiting). Aumentos en blocked pueden indicar contención de locks; runnable muy alto con latencia alta puede sugerir CPU pressure; waiting suele subir con IO.",
+            "gridPos": {
+                "x": 0,
+                "y": 8,
+                "w": 12,
+                "h": 9
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "expr": "jvm_threads_states_threads",
+                    "legendFormat": "{{state}}"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "decimals": 0
+                },
+                "overrides": []
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Heap JVM - Comprometida vs Usada (bytes)",
+            "description": "Memoria heap comprometida (committed) vs usada (used). Si used crece de forma sostenida y GC no recupera, puede haber leak o presión de memoria. Útil para correlacionar con pausas de GC y latencia.",
+            "gridPos": {
+                "x": 12,
+                "y": 8,
+                "w": 12,
+                "h": 9
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "expr": "sum(jvm_memory_committed_bytes{area=\"heap\"})",
+                    "legendFormat": "heap comprometida"
+                },
+                {
+                    "refId": "B",
+                    "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+                    "legendFormat": "heap usada"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "GC JVM - Live data size (bytes)",
+            "description": "Tamaño de datos de larga vida en heap después de GC (aprox.). Si este valor sube y no baja, suele indicar crecimiento de objetos retenidos (posible leak). Correlaciona con heap usada, pausas de GC y latencia p99.",
+            "gridPos": {
+                "x": 0,
+                "y": 17,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "expr": "jvm_gc_live_data_size_bytes",
+                    "legendFormat": "live data"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes"
+                },
+                "overrides": []
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Mantenimiento pool DB - reap / flush (tasa)",
+            "description": "Eventos de mantenimiento del pool: reap = conexiones removidas por estar idle; flush = conexiones removidas por otros motivos (no cuenta invalid/idle). Cambios bruscos o valores altos pueden indicar churn de conexiones o problemas de estabilidad.",
+            "gridPos": {
+                "x": 12,
+                "y": 17,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "expr": "rate(agroal_reap_count_total{datasource=\"default\"}[5m])",
+                    "legendFormat": "reap/s"
+                },
+                {
+                    "refId": "B",
+                    "expr": "rate(agroal_flush_count_total{datasource=\"default\"}[5m])",
+                    "legendFormat": "flush/s"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "decimals": 4
+                },
+                "overrides": []
+            }
+        }
+    ],
+    "templating": {
+        "list": []
+    }
+}

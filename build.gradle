@@ -1,0 +1,47 @@
+plugins {
+  id 'org.sonarqube' version '7.2.1.6560'
+}
+
+subprojects { sub ->
+  // Solo si el subproyecto es Java
+  sub.plugins.withType(org.gradle.api.plugins.JavaPlugin) {
+
+    // Aplica JaCoCo (esto crea jacocoTestReport automáticamente)
+    sub.apply plugin: 'jacoco'
+
+    // Test con JUnit5 (Quarkus)
+    sub.tasks.named('test') {
+      useJUnitPlatform()
+    }
+
+    // CONFIGURA (no crees) el reporte jacocoTestReport
+    sub.tasks.named('jacocoTestReport') {
+      dependsOn sub.tasks.named('test')
+
+      reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+      }
+    }
+
+    // Para que siempre se genere al correr tests
+    sub.tasks.named('test') {
+      finalizedBy sub.tasks.named('jacocoTestReport')
+    }
+  }
+}
+
+sonar {
+  properties {
+    property 'sonar.host.url', 'http://localhost:9000'
+    property 'sonar.projectKey', 'access-system'
+    property 'sonar.projectName', 'access-system'
+    property 'sonar.sourceEncoding', 'UTF-8'
+
+    // Sonar leerá los XML por módulo
+    property 'sonar.coverage.jacoco.xmlReportPaths',
+      'access-core/build/reports/jacoco/test/jacocoTestReport.xml,' +
+      'device-gateway/build/reports/jacoco/test/jacocoTestReport.xml'
+  }
+}

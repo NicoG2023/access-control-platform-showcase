@@ -1,0 +1,366 @@
+# access-core-business-alerts-ReglaAccesoService.yml
+groups:
+  - name: access-core.business.ReglaAccesoService
+    rules:
+
+      # =========================================================
+      # Guard rails: evitar ruido sin tráfico
+      # (en CRUD admin el tráfico suele ser bajo -> umbrales conservadores)
+      # =========================================================
+
+      # =========================================================
+      # 1) Error rate global del CRUD (result="error")
+      # =========================================================
+      - alert: AccessCoreRulesHighErrorRateWarning
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="error"}[10m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[10m]))
+          ) > 0.02
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): errores inesperados > 2% (15m)"
+          description: "ReglaAccesoService está arrojando result=error. Revisa logs, DB, locks, constraints y excepciones no manejadas."
+
+      - alert: AccessCoreRulesHighErrorRateCritical
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="error"}[5m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[5m]))
+          ) > 0.05
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[5m])) > 0.10
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): errores > 5% (10m)"
+          description: "Incidente probable en CRUD de reglas. Prioriza revisar DB/pool, despliegues recientes y stacktraces."
+
+      # =========================================================
+      # 2) Conflictos de duplicado (409) elevados
+      #    (medido por result=conflict)
+      # =========================================================
+      - alert: AccessCoreRulesHighConflictRateWarning
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="conflict"}[15m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[15m]))
+          ) > 0.10
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[15m])) > 0.05
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): conflictos (409) > 10% (20m)"
+          description: "Muchos duplicados lógicos al crear/actualizar reglas. Puede ser UI reintentando, firmas de matching muy estrictas o falta de feedback al usuario."
+
+      - alert: AccessCoreRulesHighConflictRateCritical
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="conflict"}[10m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[10m]))
+          ) > 0.25
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.08
+        for: 15m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): conflictos (409) > 25% (15m)"
+          description: "Probable degradación del journey admin: la mayoría de cambios terminan en 409. Revisa UX, retries, y estrategia anti-duplicados."
+
+      # =========================================================
+      # 3) BAD_REQUEST elevados (validaciones/precondiciones)
+      # =========================================================
+      - alert: AccessCoreRulesHighBadRequestRateWarning
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="bad_request"}[15m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[15m]))
+          ) > 0.08
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[15m])) > 0.05
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): 400 altos > 8% (20m)"
+          description: "Aumentaron validaciones fallidas (HH:mm, ventanas, vigencia, ids). Revisa contrato API/UI y cambios recientes."
+
+      - alert: AccessCoreRulesHighBadRequestRateCritical
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="bad_request"}[10m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[10m]))
+          ) > 0.20
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.08
+        for: 15m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): 400 > 20% (15m)"
+          description: "Contrato roto o UI/Gateway mandando payload inválido masivamente. Revisa despliegues, versionado y validaciones."
+
+      # =========================================================
+      # 4) NOT_FOUND elevado (ids rotos / tenant mismatch)
+      # =========================================================
+      - alert: AccessCoreRulesHighNotFoundRateWarning
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="not_found"}[15m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[15m]))
+          ) > 0.05
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[15m])) > 0.05
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): 404 > 5% (20m)"
+          description: "Muchos GET/UPDATE/DELETE a reglas/áreas/dispositivos inexistentes o no pertenecientes al tenant. Revisa UI cache, IDs, y sincronización."
+
+      - alert: AccessCoreRulesHighNotFoundRateCritical
+        expr: |
+          (
+            sum(rate(access_rule_ops_total{job="access-core",result="not_found"}[10m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[10m]))
+          ) > 0.15
+          and
+          sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.08
+        for: 15m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): 404 > 15% (15m)"
+          description: "Probable fallo de integración/UX: la mayoría de operaciones no encuentran recursos. Revisa rutas, tenant scoping y referencias."
+
+      # =========================================================
+      # 5) Rechazos auditados por reason (tu métrica access_rule_rejects_total)
+      #    - DUPLICATE_RULE
+      #    - VALIDATION_ERROR
+      #    - NOT_FOUND
+      #    - UNEXPECTED_ERROR
+      # =========================================================
+      - alert: AccessCoreRulesUnexpectedRejectsDetected
+        expr: |
+          increase(access_rule_rejects_total{job="access-core",reason="UNEXPECTED_ERROR",audited="true"}[10m]) > 0
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.02
+        for: 0m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): rechazos UNEXPECTED_ERROR detectados"
+          description: "Se auditaron rechazos con reason=UNEXPECTED_ERROR. Revisa stacktrace, DB constraints y errores internos."
+
+      - alert: AccessCoreRulesValidationRejectSpikeWarning
+        expr: |
+          (
+            sum(rate(access_rule_rejects_total{job="access-core",reason="VALIDATION_ERROR",audited="true"}[15m]))
+            /
+            sum(rate(access_rule_ops_total{job="access-core"}[15m]))
+          ) > 0.10
+          and sum(rate(access_rule_ops_total{job="access-core"}[15m])) > 0.05
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): rechazos por validación > 10% (20m)"
+          description: "Muchos rechazos auditados por VALIDATION_ERROR. Revisa checks HH:mm, ventanas, vigencia y device_area_mismatch."
+
+      # =========================================================
+      # 6) Zone fallback (timezone inválida/ausente) — ya tienes métrica dedicada
+      # =========================================================
+      - alert: AccessCoreRulesZoneFallbackUsedWarning
+        expr: |
+          increase(access_rule_zone_fallback_total{job="access-core"}[30m]) > 0
+          and sum(rate(access_rule_ops_total{job="access-core"}[30m])) > 0.02
+        for: 0m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): fallback de zona usado"
+          description: "resolveZoneDefensive cayó a UTC por null/exception. Revisa configuración de timezone por org/área en DB."
+
+      - alert: AccessCoreRulesZoneFallbackSpikeCritical
+        expr: |
+          increase(access_rule_zone_fallback_total{job="access-core"}[10m]) >= 5
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): spike de fallbacks de zona"
+          description: "Muchos fallbacks a UTC en poco tiempo. Puede indicar regresión en zoneProvider o datos corruptos."
+
+      # =========================================================
+      # 7) Latencia p95 por operación (op + result=ok)
+      # =========================================================
+      - alert: AccessCoreRulesOpLatencyP95HighWarning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_rule_op_seconds_bucket{job="access-core",result="ok"}[10m])) by (le, op)
+          ) > 0.30
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): p95 latencia CRUD reglas > 300ms"
+          description: "Operaciones ok están lentas (p95). Revisa DB/pool, índices, locks, GC y carga."
+
+      - alert: AccessCoreRulesOpLatencyP95HighCritical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_rule_op_seconds_bucket{job="access-core",result="ok"}[10m])) by (le, op)
+          ) > 0.80
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.08
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): p95 latencia > 800ms"
+          description: "Latencia crítica en CRUD de reglas. Prioriza revisar saturación DB, locks y timeouts."
+
+      # =========================================================
+      # 8) DB lenta (si exportas histogram buckets de access_rule_db_seconds)
+      # =========================================================
+      - alert: AccessCoreRulesDbLatencyP95HighWarning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_rule_db_seconds_bucket{job="access-core"}[10m])) by (le, op)
+          ) > 0.20
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): DB p95 > 200ms"
+          description: "La fase DB del CRUD está lenta. Revisa pool, índices, locks y presión de I/O."
+
+      - alert: AccessCoreRulesDbLatencyP95HighCritical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_rule_db_seconds_bucket{job="access-core"}[10m])) by (le, op)
+          ) > 0.50
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.08
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): DB p95 > 500ms"
+          description: "Saturación probable en DB. Prioriza revisar conexiones, locks y queries."
+
+      # =========================================================
+      # 9) Publicación de eventos lenta (si exportas histogram buckets)
+      # =========================================================
+      - alert: AccessCoreRulesEventPublishP95HighWarning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_rule_event_publish_seconds_bucket{job="access-core"}[10m])) by (le, op)
+          ) > 0.15
+          and sum(rate(access_rule_ops_total{job="access-core"}[10m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): publish events p95 > 150ms"
+          description: "Publicar eventos (policy changed / reject) está lento. Si el publisher es in-process, revisa listeners; si es Kafka/HTTP, revisa dependencia."
+
+      # =========================================================
+      # 10) Señales de mala calidad de payload (precond/validation)
+      # =========================================================
+      - alert: AccessCoreRulesPreconditionFailedSpikeWarning
+        expr: |
+          increase(access_rule_precondition_failed_total{job="access-core"}[15m]) > 10
+          and sum(rate(access_rule_ops_total{job="access-core"}[15m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): muchos precondition_failed"
+          description: "Muchos requests fallan por campos obligatorios (orgId/idArea/reglaId/page/size). Revisa UI/cliente."
+
+      - alert: AccessCoreRulesValidationFailedSpikeWarning
+        expr: |
+          increase(access_rule_validation_failed_total{job="access-core"}[15m]) > 10
+          and sum(rate(access_rule_ops_total{job="access-core"}[15m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): muchas validaciones fallidas"
+          description: "Spike de checks fallidos (hhmm_format, vigencia_missing_pair, device_area_mismatch, etc.). Revisa cambios en el contrato o input del admin."
+
+      # =========================================================
+      # 11) Policy changed “silencioso” (opcional)
+      #     Útil para detectar que el admin está cambiando reglas masivamente.
+      # =========================================================
+      - alert: AccessCoreRulesPolicyChangeBurstWarning
+        expr: |
+          increase(access_rule_policy_changed_total{job="access-core"}[10m]) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: access-core
+          category: rules
+        annotations:
+          summary: "Access-Core (ReglaAcceso): muchos policy changes en poco tiempo"
+          description: "Cambios masivos de reglas (CREATED/UPDATED/ACTIVATED/INACTIVATED/SOFT_DELETED). Verifica si es despliegue o operación planificada."

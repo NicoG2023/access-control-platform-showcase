@@ -1,0 +1,82 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    testImplementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation 'io.quarkus:quarkus-hibernate-orm-panache'
+    implementation 'io.quarkus:quarkus-smallrye-fault-tolerance'
+    implementation 'io.quarkus:quarkus-cache'
+    implementation 'io.quarkus:quarkus-flyway'
+    implementation 'io.quarkus:quarkus-messaging-kafka'
+    implementation 'io.quarkus:quarkus-jdbc-postgresql'
+    implementation 'io.quarkus:quarkus-oidc'
+    implementation 'io.quarkus:quarkus-logging-json'
+    implementation 'io.quarkus:quarkus-smallrye-health'
+    implementation 'io.quarkus:quarkus-security'
+    implementation 'io.quarkus:quarkus-jackson'
+    implementation 'io.quarkus:quarkus-hibernate-validator'
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
+    implementation 'io.quarkus:quarkus-rest'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-micrometer-registry-prometheus'
+    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-rest-client'
+    implementation 'io.quarkus:quarkus-scheduler'
+    implementation "io.quarkus:quarkus-micrometer"
+    implementation "io.quarkus:quarkus-rest-client-jackson"
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.quarkus:quarkus-junit5-mockito'
+    testImplementation 'io.rest-assured:rest-assured'
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.assertj:assertj-core:3.27.6'
+    testImplementation "org.mockito:mockito-core:5.21.0"
+    testImplementation "org.mockito:mockito-junit-jupiter:5.21.0"
+}
+
+group = 'com.haedcom.access'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+test {
+    useJUnitPlatform()
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+    jvmArgs "--add-opens", "java.base/java.lang=ALL-UNNAMED"
+
+    // Cargar .env desde la raíz del repo
+    def envFile = file("${rootProject.projectDir}/.env")
+    if (envFile.exists()) {
+        envFile.eachLine { line ->
+            def l = line.trim()
+            if (!l || l.startsWith("#") || !l.contains("=")) return
+            def (k, v) = l.split("=", 2)
+            environment k.trim(), v.trim()
+        }
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}

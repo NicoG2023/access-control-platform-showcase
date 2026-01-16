@@ -1,0 +1,323 @@
+{
+    "uid": "access-core-business-rules",
+    "title": "Access Core - Negocio (Reglas de acceso)",
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 4,
+    "refresh": "10s",
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "tags": [
+        "haedcom",
+        "access-core",
+        "negocio",
+        "reglas"
+    ],
+    "panels": [
+        {
+            "id": 1,
+            "type": "timeseries",
+            "title": "RPS total (CRUD de reglas)",
+            "description": "Requests por segundo agregadas de todas las operaciones del CRUD de reglas (access_rule_ops_total). Útil para ver carga y picos de uso en la administración de reglas.",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_rule_ops_total{job=\"access-core\"}[5m]))",
+                    "legendFormat": "rps",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "timeseries",
+            "title": "RPS por operación (list/get/create/update/change/delete)",
+            "description": "Requests por segundo separadas por operación (tag op). Sirve para identificar qué tipo de acción está generando la carga (p. ej. list vs create).",
+            "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (op) (rate(access_rule_ops_total{job=\"access-core\"}[5m]))",
+                    "legendFormat": "{{op}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "timeseries",
+            "title": "Resultados del CRUD (ok / bad_request / conflict / not_found / error)",
+            "description": "Tasa de resultados por tipo (tag result). Si suben bad_request/conflict/not_found, revisa validaciones, anti-duplicados, payloads y consistencia tenant-safe.",
+            "gridPos": {
+                "x": 0,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (result) (rate(access_rule_ops_total{job=\"access-core\"}[10m]))",
+                    "legendFormat": "{{result}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "Latencia del CRUD p50 / p95 / p99 (ms)",
+            "description": "Latencia global del CRUD usando histogramas (access_rule_op_seconds_bucket). p50 = típico, p95/p99 = cola. Si sube, correlaciona con RPS y DB.",
+            "gridPos": {
+                "x": 12,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum(rate(access_rule_op_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum(rate(access_rule_op_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.99, sum(rate(access_rule_op_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "type": "timeseries",
+            "title": "Latencia p95 por operación (ms)",
+            "description": "p95 por tipo de operación (tag op) para detectar rápidamente qué acción del CRUD está lenta (list vs create/update). Usa access_rule_op_seconds_bucket.",
+            "gridPos": {
+                "x": 0,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum by (le, op) (rate(access_rule_op_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p95 {{op}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "type": "timeseries",
+            "title": "Tasa de errores del CRUD (%)",
+            "description": "Porcentaje de resultados no OK (bad_request/conflict/not_found/error) sobre el total del CRUD. Útil para detectar degradación funcional sin depender del volumen absoluto.",
+            "gridPos": {
+                "x": 12,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "100 * (sum(rate(access_rule_ops_total{job=\"access-core\",result=~\"bad_request|conflict|not_found|error\"}[10m])) / sum(rate(access_rule_ops_total{job=\"access-core\"}[10m])))",
+                    "legendFormat": "error_rate_%",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "type": "timeseries",
+            "title": "Latencia DB p50/p95 por operación (ms)",
+            "description": "Tiempo en DB (flush/persist/queries internas) por operación (access_rule_db_seconds_bucket con tag op). Útil para separar problemas de DB vs lógica del servicio.",
+            "gridPos": {
+                "x": 0,
+                "y": 24,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum by (le, op) (rate(access_rule_db_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p50 {{op}}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum by (le, op) (rate(access_rule_db_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p95 {{op}}",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "type": "timeseries",
+            "title": "Latencia publish eventos p50/p95 por operación (ms)",
+            "description": "Tiempo publicando eventos (policy change / reject) por operación (access_rule_event_publish_seconds_bucket con tag op). Si sube, revisa outbox sender, broker, retries, etc.",
+            "gridPos": {
+                "x": 12,
+                "y": 24,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum by (le, op) (rate(access_rule_event_publish_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p50 {{op}}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum by (le, op) (rate(access_rule_event_publish_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p95 {{op}}",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "timeseries",
+            "title": "Rechazos por motivo (rate)",
+            "description": "Tasa de rechazos del flujo de reglas por reasonCode estable (tag reason). Ej: NOT_FOUND, VALIDATION_ERROR, DUPLICATE_RULE, UNEXPECTED_ERROR. Útil para calidad de uso y troubleshooting.",
+            "gridPos": {
+                "x": 0,
+                "y": 32,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (reason) (rate(access_rule_rejects_total{job=\"access-core\"}[15m]))",
+                    "legendFormat": "{{reason}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Rechazos auditados vs no auditados",
+            "description": "Comparación entre rechazos donde se pudo emitir auditoría funcional (audited=true) vs los que no (audited=false). audited=false suele indicar que faltó areaId (p. ej. 404 antes de conocer el área).",
+            "gridPos": {
+                "x": 12,
+                "y": 32,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (audited) (rate(access_rule_rejects_total{job=\"access-core\"}[15m]))",
+                    "legendFormat": "auditado={{audited}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "type": "table",
+            "title": "Validaciones fallidas por check (top causas)",
+            "description": "Tasa de validaciones fallidas por tipo de check (tag check) y operación (tag op). Ayuda a detectar rápidamente errores típicos (hhmm_format, daily_window_missing_pair, device_area_mismatch, etc.).",
+            "gridPos": {
+                "x": 0,
+                "y": 40,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (check, op) (rate(access_rule_validation_failed_total{job=\"access-core\"}[30m]))",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "type": "table",
+            "title": "Precondiciones fallidas por campo (input inválido)",
+            "description": "Tasa de fallos por precondición (tag field) y operación (tag op). Típico: orgId/reglaId/idArea/page/size. Útil para detectar problemas de integraciones o UI enviando parámetros inválidos.",
+            "gridPos": {
+                "x": 12,
+                "y": 40,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (field, op) (rate(access_rule_precondition_failed_total{job=\"access-core\"}[30m]))",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "type": "timeseries",
+            "title": "Uso de funcionalidades en reglas (adopción)",
+            "description": "Adopción de features por operación (tags feature + op). Ej: vigencia_utc, daily_window, device_scoped. Útil para entender qué tan “avanzadas” son las reglas que se están creando/actualizando.",
+            "gridPos": {
+                "x": 0,
+                "y": 48,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (feature, op) (rate(access_rule_feature_used_total{job=\"access-core\"}[1h]))",
+                    "legendFormat": "{{feature}} ({{op}})",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "type": "timeseries",
+            "title": "Fallback de zona horaria (incremento)",
+            "description": "Incremento de veces que se usó UTC por fallback al resolver la zona efectiva (timezone). Debe ser ~0. Si sube, revisa configuraciones inválidas o faltantes en DB (TenantZoneProvider).",
+            "gridPos": {
+                "x": 12,
+                "y": 48,
+                "w": 6,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "increase(access_rule_zone_fallback_total{job=\"access-core\"}[30m])",
+                    "legendFormat": "fallback",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "type": "timeseries",
+            "title": "Eventos de cambio de política emitidos",
+            "description": "Tasa de eventos de policy change (cache invalidation) emitidos por tipo (CREATED/UPDATED/ACTIVATED/INACTIVATED/SOFT_DELETED). Útil para verificar que el outbox/eventPublisher está funcionando.",
+            "gridPos": {
+                "x": 18,
+                "y": 48,
+                "w": 6,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (type) (rate(access_rule_policy_changed_total{job=\"access-core\"}[30m]))",
+                    "legendFormat": "{{type}}",
+                    "refId": "A"
+                }
+            ]
+        }
+    ]
+}

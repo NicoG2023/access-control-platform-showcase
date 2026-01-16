@@ -1,0 +1,6 @@
+projectKey=access-system
+serverUrl=http://localhost:9000
+serverVersion=25.12.0.117093
+dashboardUrl=http://localhost:9000/dashboard?id=access-system
+ceTaskId=9f9ccb7f-b88c-4c6d-851a-3feeec29514b
+ceTaskUrl=http://localhost:9000/api/ce/task?id=9f9ccb7f-b88c-4c6d-851a-3feeec29514b

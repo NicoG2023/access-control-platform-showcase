@@ -1,0 +1,296 @@
+{
+    "uid": "access-core-business-decision-engine",
+    "title": "Access Core - Negocio (Decision Engine)",
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "tags": [
+        "haedcom",
+        "access-core",
+        "negocio",
+        "decision-engine"
+    ],
+    "panels": [
+        {
+            "id": 1,
+            "type": "timeseries",
+            "title": "RPS de decisiones (engine)",
+            "description": "Tasa total de decisiones emitidas por el DecisionEngine (access_engine_decisions_total). Útil para ver carga del motor y picos.",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_engine_decisions_total{job=\"access-core\"}[5m]))",
+                    "legendFormat": "rps",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "timeseries",
+            "title": "RPS por resultado (ALLOW/DENY/PENDING/ERROR)",
+            "description": "Distribución de resultados (tag result) del motor. Si sube ERROR, hay degradación. Si sube PENDING, puede haber cambios en reglas o comportamiento del gateway.",
+            "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (result) (rate(access_engine_decisions_total{job=\"access-core\"}[10m]))",
+                    "legendFormat": "{{result}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "timeseries",
+            "title": "Motivos (reason) - Top (rate)",
+            "description": "Tasa por motivo (tag reason). Útil para ver NO_RULES_FOR_CONTEXT vs NO_MATCHING_RULE vs POLICY_ERROR, etc. (ojo cardinalidad).",
+            "gridPos": {
+                "x": 0,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "topk(8, sum by (reason) (rate(access_engine_decisions_total{job=\"access-core\"}[15m])))",
+                    "legendFormat": "{{reason}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "Error rate del engine (%)",
+            "description": "Porcentaje de decisiones ERROR sobre el total. Si sube, revisa contexto incompleto, catálogo/motivos y excepciones.",
+            "gridPos": {
+                "x": 12,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "100 * (sum(rate(access_engine_decisions_total{job=\"access-core\",result=\"ERROR\"}[5m])) / sum(rate(access_engine_decisions_total{job=\"access-core\"}[5m])))",
+                    "legendFormat": "error_% (5m)",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "timeseries",
+            "title": "Latencia del engine p50/p95/p99 (ms)",
+            "description": "Latencia end-to-end del evaluate (access_engine_seconds_bucket). p95/p99 son cola. Si sube, correlaciona con candidatos y match.",
+            "gridPos": {
+                "x": 0,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum(rate(access_engine_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum(rate(access_engine_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.99, sum(rate(access_engine_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Latencia del matching p50/p95/p99 (ms)",
+            "description": "Tiempo del stream/filter/max en memoria (access_engine_match_seconds_bucket). Si sube, normalmente es explosión de candidatos o reglas poco selectivas.",
+            "gridPos": {
+                "x": 12,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum(rate(access_engine_match_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum(rate(access_engine_match_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.99, sum(rate(access_engine_match_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "Candidatos por decisión (promedio)",
+            "description": "Promedio de candidatos evaluados por decisión. Usa DistributionSummary (access_engine_candidates_count_sum/_count). Si sube, revisa partición por org/area/sujeto y query/cache del provider.",
+            "gridPos": {
+                "x": 0,
+                "y": 24,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "rate(access_engine_candidates_count_sum{job=\"access-core\"}[10m]) / rate(access_engine_candidates_count_count{job=\"access-core\"}[10m])",
+                    "legendFormat": "avg_candidates",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "type": "timeseries",
+            "title": "Candidatos (p95 aproximado por ventana)",
+            "description": "Aproximación de cola: compara promedio con el máximo observado en ventana (si exportas _max). Si no existe _max en tu exporter, puedes borrar este panel.",
+            "gridPos": {
+                "x": 12,
+                "y": 24,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "max_over_time(access_engine_candidates_count_max{job=\"access-core\"}[10m])",
+                    "legendFormat": "max_candidates_10m",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "type": "timeseries",
+            "title": "Fallback de zona horaria (incremento)",
+            "description": "Incremento de veces que se usó UTC por fallback al resolver zona efectiva (access_engine_zone_fallback_total). Debe ser ~0.",
+            "gridPos": {
+                "x": 0,
+                "y": 32,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "increase(access_engine_zone_fallback_total{job=\"access-core\"}[30m])",
+                    "legendFormat": "fallback_30m",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "type": "timeseries",
+            "title": "Reglas malformadas (ventana diaria) - incremento",
+            "description": "Incremento de reglas detectadas con ventana diaria malformada (solo desde o solo hasta). Esto impacta NO_MATCHING_RULE.",
+            "gridPos": {
+                "x": 12,
+                "y": 32,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "increase(access_engine_rules_malformed_daily_total{job=\"access-core\"}[30m])",
+                    "legendFormat": "malformed_daily_30m",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "type": "timeseries",
+            "title": "NO_RULES_FOR_CONTEXT vs NO_MATCHING_RULE (rate)",
+            "description": "Comparación rápida de dos fallos de política: (a) no hay reglas base, (b) hay reglas base pero ninguna aplica.",
+            "gridPos": {
+                "x": 0,
+                "y": 40,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_engine_decisions_total{job=\"access-core\",reason=\"NO_RULES_FOR_CONTEXT\"}[10m]))",
+                    "legendFormat": "NO_RULES_FOR_CONTEXT",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(access_engine_decisions_total{job=\"access-core\",reason=\"NO_MATCHING_RULE\"}[10m]))",
+                    "legendFormat": "NO_MATCHING_RULE",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "type": "timeseries",
+            "title": "POLICY_ERROR (rate) y share (%)",
+            "description": "POLICY_ERROR suele indicar contexto incompleto, acción nula o inconsistencias de datos. Muestra rate y porcentaje.",
+            "gridPos": {
+                "x": 12,
+                "y": 40,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_engine_decisions_total{job=\"access-core\",reason=\"POLICY_ERROR\"}[10m]))",
+                    "legendFormat": "policy_error_rps",
+                    "refId": "A"
+                },
+                {
+                    "expr": "100 * (sum(rate(access_engine_decisions_total{job=\"access-core\",reason=\"POLICY_ERROR\"}[10m])) / sum(rate(access_engine_decisions_total{job=\"access-core\"}[10m])))",
+                    "legendFormat": "policy_error_%",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "type": "table",
+            "title": "Tabla: resultado x motivo (top combinaciones)",
+            "description": "Top combinaciones (result, reason) por tasa. Excelente para entender qué está dominando (DENY+NO_MATCH, ERROR+POLICY_ERROR, etc.).",
+            "gridPos": {
+                "x": 0,
+                "y": 48,
+                "w": 24,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "topk(15, sum by (result, reason) (rate(access_engine_decisions_total{job=\"access-core\"}[30m])))",
+                    "refId": "A"
+                }
+            ]
+        }
+    ]
+}

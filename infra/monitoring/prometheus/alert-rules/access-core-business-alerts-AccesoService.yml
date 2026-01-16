@@ -1,0 +1,344 @@
+groups:
+  - name: access-core.business.AccesoService
+    rules:
+      # =========================================================
+      # 1) Error funcional del caso de uso (tu flow)
+      # =========================================================
+      - alert: AccessCoreBusinessHighAttemptErrorRateWarning
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="error"}[5m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[5m]))
+          ) > 0.02
+          and
+          sum(rate(access_attempts_total{job="access-core"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: error del flujo de acceso > 2% (10m)"
+          description: "registrarIntento está fallando (result=error) con tráfico suficiente. Revisa logs, DB, catálogo y timeouts."
+
+      - alert: AccessCoreBusinessHighAttemptErrorRateCritical
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="error"}[5m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[5m]))
+          ) > 0.05
+          and
+          sum(rate(access_attempts_total{job="access-core"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: error del flujo de acceso > 5% (5m)"
+          description: "Incidente probable: alto % de errores funcionales con tráfico. Revisa dependencias, pool DB y excepciones."
+
+      # =========================================================
+      # 2) NOT_FOUND anómalo
+      # =========================================================
+      - alert: AccessCoreBusinessHighNotFoundRateWarning
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="not_found"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.05
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: NOT_FOUND > 5% (15m)"
+          description: "Muchos intentos apuntan a dispositivo no existente / tenant mismatch. Puede ser gateway mal configurado o IDs rotos."
+
+      - alert: AccessCoreBusinessHighNotFoundRateCritical
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="not_found"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.15
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: NOT_FOUND > 15% (10m)"
+          description: "Probable fallo de integración: la mayoría de intentos no encuentra el dispositivo. Verifica mapeos tenant/area/dispositivo."
+
+      # =========================================================
+      # 3) BAD_REQUEST anómalo
+      # =========================================================
+      - alert: AccessCoreBusinessHighBadRequestRateWarning
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="bad_request"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.03
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: BAD_REQUEST > 3% (15m)"
+          description: "Aumentaron requests inválidos (validaciones / idemKey). Revisa contratos y versionado del gateway."
+
+      - alert: AccessCoreBusinessHighBadRequestRateCritical
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="bad_request"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.10
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: BAD_REQUEST > 10% (10m)"
+          description: "Incidente probable: muchos requests inválidos. Revisa gateway, validaciones y despliegues recientes."
+
+      # =========================================================
+      # 4) Idempotencia anómala
+      # =========================================================
+      - alert: AccessCoreBusinessHighIdempotentHitRateWarning
+        expr: |
+          (
+            sum(rate(access_attempts_total{job="access-core",result="idempotent_hit"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.30
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.2
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: idempotent_hit > 30% (20m)"
+          description: "Muchos reintentos pegan idempotencia. Puede ser timeouts upstream, retries agresivos o idemKey mal generada."
+
+      # =========================================================
+      # 5) NO_MATCHING_RULE alto (según bucket)
+      # =========================================================
+      - alert: AccessCoreBusinessHighNoMatchReasonRateWarning
+        expr: |
+          (
+            sum(rate(access_decision_reasons_total{job="access-core",bucket="no_match"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.10
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: decisiones con no_match > 10% (15m)"
+          description: "El motor no encuentra regla aplicable. Revisa reglas activas por área/sujeto y caches."
+
+      - alert: AccessCoreBusinessHighNoMatchReasonRateCritical
+        expr: |
+          (
+            sum(rate(access_decision_reasons_total{job="access-core",bucket="no_match"}[10m]))
+            /
+            sum(rate(access_attempts_total{job="access-core"}[10m]))
+          ) > 0.30
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: decisiones con no_match > 30% (10m)"
+          description: "Probable outage de política: casi todo queda sin regla. Revisa carga/estado de reglas e invalidación de caché."
+
+      # =========================================================
+      # 6) Decisiones ERROR spike (label correcto: result)
+      # =========================================================
+      - alert: AccessCoreBusinessDecisionErrorSpikeWarning
+        expr: |
+          (
+            sum(rate(access_decisions_total{job="access-core",result="ERROR"}[5m]))
+            /
+            sum(rate(access_decisions_total{job="access-core"}[5m]))
+          ) > 0.02
+          and
+          sum(rate(access_decisions_total{job="access-core"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: decisiones ERROR > 2% (10m)"
+          description: "El motor/flujo produce decisiones ERROR. Revisa excepciones, contexto incompleto y catálogo de motivos."
+
+      - alert: AccessCoreBusinessDecisionErrorSpikeCritical
+        expr: |
+          (
+            sum(rate(access_decisions_total{job="access-core",result="ERROR"}[5m]))
+            /
+            sum(rate(access_decisions_total{job="access-core"}[5m]))
+          ) > 0.05
+          and
+          sum(rate(access_decisions_total{job="access-core"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: decisiones ERROR > 5% (5m)"
+          description: "Incidente probable: el motor falla con tráfico. Prioriza investigar exceptions y dependencias."
+
+      # =========================================================
+      # 7) Comandos emitidos vs expected (ok)
+      # =========================================================
+      - alert: AccessCoreBusinessLowCommandEmissionRateWarning
+        expr: |
+          (
+            sum(rate(access_commands_emitted_total{job="access-core"}[10m]))
+            /
+            sum(rate(access_commands_expected_total{job="access-core"}[10m]))
+          ) < 0.90
+          and
+          sum(rate(access_commands_expected_total{job="access-core"}[10m])) > 0.2
+        for: 20m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: emisión de comandos baja vs expected (20m)"
+          description: "El motor sugiere comandos pero no se están emitiendo/persistiendo. Revisa construirComando, persistencia y constraints."
+
+      - alert: AccessCoreBusinessLowCommandEmissionRateCritical
+        expr: |
+          (
+            sum(rate(access_commands_emitted_total{job="access-core"}[10m]))
+            /
+            sum(rate(access_commands_expected_total{job="access-core"}[10m]))
+          ) < 0.70
+          and
+          sum(rate(access_commands_expected_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: emisión de comandos muy baja vs expected (10m)"
+          description: "Incidente probable: comandos sugeridos no se están emitiendo. Revisa fallos en persistencia y errores internos."
+
+      # =========================================================
+      # 8) Latencia p95 del flujo (usa access_flow_seconds_bucket)
+      # =========================================================
+      - alert: AccessCoreBusinessFlowP95HighWarning
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_flow_seconds_bucket{job="access-core",result="ok"}[10m])) by (le)
+          ) > 0.25
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: flow p95 > 250ms (15m)"
+          description: "El caso de uso completo está lento (p95). Revisa pool DB, locks, GC y dependencias."
+
+      - alert: AccessCoreBusinessFlowP95HighCritical
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(access_flow_seconds_bucket{job="access-core",result="ok"}[10m])) by (le)
+          ) > 0.75
+          and
+          sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: flow p95 > 750ms (10m)"
+          description: "Latencia crítica del flujo. Prioriza investigar saturación DB, locks, timeouts y backpressure."
+
+      # =========================================================
+      # 9) Catálogo incompleto: fallback usado
+      # =========================================================
+      - alert: AccessCoreBusinessMotivoFallbackUsedWarning
+        expr: |
+          increase(access_motivo_fallback_used_total{job="access-core"}[15m]) > 0
+          and
+          sum(rate(access_attempts_total{job="access-core"}[15m])) > 0.1
+        for: 0m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: se usó motivo fallback"
+          description: "El engine devolvió un código de motivo no existente en catálogo y se usó POLICY_ERROR fallback. Revisa consistencia engine vs catálogo."
+
+      # =========================================================
+      # 11) Engine devuelve null
+      # =========================================================
+      - alert: AccessCoreBusinessEngineNullDetected
+        expr: |
+          increase(access_decision_reasons_total{job="access-core",bucket="engine_null"}[10m]) > 0
+          and sum(rate(access_attempts_total{job="access-core"}[10m])) > 0.1
+        for: 0m
+        labels:
+          severity: critical
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: DecisionEngine devolvió null"
+          description: "Bug: el engine retornó null. Revisa implementación, null-safety y errores internos."
+
+      # =========================================================
+      # 10) Engine devuelve null
+      # =========================================================
+      - alert: AccessCoreBusinessCommandGapDetected
+        expr: |
+          increase(access_commands_gap_total{job="access-core"}[10m]) > 0
+          and sum(rate(access_commands_expected_total{job="access-core"}[10m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: access-core
+          category: business
+        annotations:
+          summary: "Access-Core: gap entre comandos sugeridos vs construidos"
+          description: "El engine sugiere comando pero no se construye/persiste. Revisa mapping de comandos y reglas de negocio."
+

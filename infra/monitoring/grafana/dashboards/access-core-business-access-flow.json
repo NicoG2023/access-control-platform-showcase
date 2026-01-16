@@ -1,0 +1,328 @@
+{
+    "uid": "access-core-business-access-flow",
+    "title": "Access Core - Negocio (Flujo de acceso)",
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "tags": [
+        "haedcom",
+        "access-core",
+        "negocio",
+        "acceso",
+        "decision",
+        "comandos"
+    ],
+    "panels": [
+        {
+            "id": 1,
+            "type": "timeseries",
+            "title": "RPS total (registrar intento)",
+            "description": "Requests por segundo del caso de uso principal (registrarIntento). Basado en access_attempts_total (por resultado).",
+            "gridPos": {
+                "x": 0,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_attempts_total{job=\"access-core\"}[5m]))",
+                    "legendFormat": "rps",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "timeseries",
+            "title": "RPS por resultado (ok / idempotent_hit / bad_request / not_found / conflict / error)",
+            "description": "Distribución de carga por resultado final del flujo. Te muestra rápidamente si la carga viene de hits idempotentes o de intentos nuevos, y si está creciendo el error funcional.",
+            "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (result) (rate(access_attempts_total{job=\"access-core\"}[5m]))",
+                    "legendFormat": "{{result}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "timeseries",
+            "title": "Tasa de errores del flujo (%)",
+            "description": "Porcentaje de resultados no OK sobre el total. Incluye bad_request, not_found, conflict y error. Útil como ‘health’ funcional del caso de uso.",
+            "gridPos": {
+                "x": 0,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "100 * (sum(rate(access_attempts_total{job=\"access-core\",result=~\"bad_request|not_found|conflict|error\"}[10m])) / sum(rate(access_attempts_total{job=\"access-core\"}[10m])))",
+                    "legendFormat": "error_rate_%",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "Latencia total del flujo p50 / p95 / p99 (ms)",
+            "description": "Latencia end-to-end del caso de uso (access_flow_seconds) por resultado. p95/p99 detectan degradación en cola.",
+            "gridPos": {
+                "x": 12,
+                "y": 8,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum(rate(access_flow_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum(rate(access_flow_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.99, sum(rate(access_flow_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "timeseries",
+            "title": "Latencia total p95 por resultado (ms)",
+            "description": "p95 por resultado (tag result) para distinguir si la latencia está asociada a errores (p.ej. not_found) o a flujos ok.",
+            "gridPos": {
+                "x": 0,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum by (le, result) (rate(access_flow_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p95 {{result}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Idempotencia: hits vs nuevos intentos (rate)",
+            "description": "Comparación de tasa de resultados idempotentes vs OK. Si idempotent_hit domina, tienes reintentos frecuentes del gateway/dispositivo (o duplicados).",
+            "gridPos": {
+                "x": 12,
+                "y": 16,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_attempts_total{job=\"access-core\",result=\"idempotent_hit\"}[10m]))",
+                    "legendFormat": "idempotent_hit",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(access_attempts_total{job=\"access-core\",result=\"ok\"}[10m]))",
+                    "legendFormat": "ok",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "Latencia del motor de decisión p50/p95/p99 (ms)",
+            "description": "Tiempo de evaluación del DecisionEngine usado por AccesoService (access_engine_seconds). Si sube, correlaciona con candidates/matching del engine y carga de reglas.",
+            "gridPos": {
+                "x": 0,
+                "y": 24,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum(rate(access_engine_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p50",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum(rate(access_engine_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p95",
+                    "refId": "B"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.99, sum(rate(access_engine_seconds_bucket{job=\"access-core\"}[10m])) by (le))",
+                    "legendFormat": "p99",
+                    "refId": "C"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "type": "timeseries",
+            "title": "Decisiones por resultado (rate)",
+            "description": "Distribución de decisiones tomadas en el flujo (access_decisions_total, tag result). Útil para ver si aumenta DENEGAR/PENDIENTE/ERROR.",
+            "gridPos": {
+                "x": 12,
+                "y": 24,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (result) (rate(access_decisions_total{job=\"access-core\"}[10m]))",
+                    "legendFormat": "{{result}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "type": "timeseries",
+            "title": "Motivos de decisión (buckets) (rate)",
+            "description": "Buckets simplificados del motivo de decisión (access_decision_reasons_total, tag bucket). Te ayuda a ver si crece no_match/policy_error/engine_null/missing.",
+            "gridPos": {
+                "x": 0,
+                "y": 32,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum by (bucket) (rate(access_decision_reasons_total{job=\"access-core\"}[15m]))",
+                    "legendFormat": "{{bucket}}",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "type": "timeseries",
+            "title": "Motivo fallback usado (incremento)",
+            "description": "Incremento de veces que el motivo retornado por el engine no existía en catálogo y se usó el fallback (access_motivo_fallback_used_total). Debe tender a 0.",
+            "gridPos": {
+                "x": 12,
+                "y": 32,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "increase(access_motivo_fallback_used_total{job=\"access-core\"}[30m])",
+                    "legendFormat": "fallback_motivo",
+                    "refId": "A"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "type": "timeseries",
+            "title": "DB por fase p50/p95 (ms)",
+            "description": "Tiempo en DB por fase (tag phase) para separar dónde se está yendo el tiempo (persist_intento, persist_decision, persist_comando, flush). Usa access_db_seconds_bucket.",
+            "gridPos": {
+                "x": 0,
+                "y": 40,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum by (le, phase) (rate(access_db_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p50 {{phase}}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum by (le, phase) (rate(access_db_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p95 {{phase}}",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "type": "timeseries",
+            "title": "Publish eventos por tipo p50/p95 (ms)",
+            "description": "Tiempo publicando eventos de dominio por tipo (tag event): IntentoAccesoRegistrado, DecisionAccesoTomada, ComandoDispositivoEmitido. Usa access_publish_seconds_bucket.",
+            "gridPos": {
+                "x": 12,
+                "y": 40,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "1000 * histogram_quantile(0.50, sum by (le, event) (rate(access_publish_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p50 {{event}}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "1000 * histogram_quantile(0.95, sum by (le, event) (rate(access_publish_seconds_bucket{job=\"access-core\"}[10m])))",
+                    "legendFormat": "p95 {{event}}",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "type": "timeseries",
+            "title": "Comandos: esperados vs emitidos (rate)",
+            "description": "Comparación entre comandos sugeridos por el engine (access_commands_expected_total) y comandos efectivamente emitidos (access_commands_emitted_total). Si hay gap, revisa lógica de construirComandoDesdeDecisionOutput.",
+            "gridPos": {
+                "x": 0,
+                "y": 48,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_commands_expected_total{job=\"access-core\"}[10m]))",
+                    "legendFormat": "esperados",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(access_commands_emitted_total{job=\"access-core\"}[10m]))",
+                    "legendFormat": "emitidos",
+                    "refId": "B"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "type": "timeseries",
+            "title": "Comandos gap (sugerido pero no emitido) (rate)",
+            "description": "Tasa de gaps (access_commands_gap_total): el engine sugirió comando pero el servicio no construyó/persistió comando. Debe ser ~0; si sube, hay un bug o una condición no cubierta.",
+            "gridPos": {
+                "x": 12,
+                "y": 48,
+                "w": 12,
+                "h": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(access_commands_gap_total{job=\"access-core\"}[15m]))",
+                    "legendFormat": "gap",
+                    "refId": "A"
+                }
+            ]
+        }
+    ]
+}
